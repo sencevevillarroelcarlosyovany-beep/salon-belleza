@@ -8,7 +8,6 @@ class Auth {
     // Iniciar sesión
     async login(email, password) {
         try {
-            // Buscar usuario
             const { data: user, error } = await this.supabase
                 .from('usuarios')
                 .select('*')
@@ -17,20 +16,14 @@ class Auth {
                 .single();
 
             if (error) throw error;
+            if (!user) throw new Error('Usuario no encontrado');
 
-            if (!user) {
-                throw new Error('Usuario no encontrado');
-            }
-
-            // Verificar aprobación para clientes
             if (user.rol === 'cliente' && !user.aprobado) {
                 throw new Error('Cuenta pendiente de aprobación');
             }
 
-            // Guardar sesión
             this.currentUser = user;
             localStorage.setItem('usuario', JSON.stringify(user));
-            
             return user;
         } catch (error) {
             throw new Error(`Error al iniciar sesión: ${error.message}`);
@@ -40,35 +33,28 @@ class Auth {
     // Registro de cliente
     async register(nombre, email, telefono, password) {
         try {
-            // Verificar si el email ya existe
             const { data: existingUser } = await this.supabase
                 .from('usuarios')
                 .select('email')
                 .eq('email', email)
                 .single();
 
-            if (existingUser) {
-                throw new Error('El email ya está registrado');
-            }
+            if (existingUser) throw new Error('El email ya está registrado');
 
-            // Crear nuevo usuario (pendiente de aprobación)
             const { data: user, error } = await this.supabase
                 .from('usuarios')
-                .insert([
-                    {
-                        nombre: nombre,
-                        email: email,
-                        telefono: telefono,
-                        password: password,
-                        rol: 'cliente',
-                        aprobado: false
-                    }
-                ])
+                .insert([{
+                    nombre: nombre,
+                    email: email,
+                    telefono: telefono,
+                    password: password,
+                    rol: 'cliente',
+                    aprobado: false
+                }])
                 .select()
                 .single();
 
             if (error) throw error;
-
             return user;
         } catch (error) {
             throw new Error(`Error al registrarse: ${error.message}`);
@@ -96,21 +82,18 @@ class Auth {
     // Verificar sesión
     checkAuth(requiredRole = null) {
         const user = this.getCurrentUser();
-        
         if (!user) {
             window.location.href = 'index.html';
             return null;
         }
-
         if (requiredRole && user.rol !== requiredRole) {
             window.location.href = 'index.html';
             return null;
         }
-
         return user;
     }
 
-    // Aprobar cliente (solo admin)
+    // Aprobar cliente
     async aprobarCliente(userId) {
         try {
             const { data, error } = await this.supabase
@@ -126,7 +109,7 @@ class Auth {
         }
     }
 
-    // Obtener clientes pendientes (solo admin)
+    // Obtener clientes pendientes
     async getClientesPendientes() {
         try {
             const { data, error } = await this.supabase

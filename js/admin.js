@@ -20,7 +20,6 @@ class Admin {
             }
 
             const { data, error } = await query;
-
             if (error) throw error;
             return data;
         } catch (error) {
@@ -28,7 +27,7 @@ class Admin {
         }
     }
 
-    // Obtener citas de una fecha específica
+    // Obtener citas por fecha
     async getCitasPorFecha(fecha) {
         try {
             const { data, error } = await this.supabase
@@ -67,13 +66,12 @@ class Admin {
     generarFactura(cita) {
         const numeroFactura = `FAC-${Date.now()}`;
         const fecha = new Date();
-        
         return {
             numero: numeroFactura,
             fecha: fecha.toISOString().split('T')[0],
             cliente: cita.usuarios.nombre,
             servicio: cita.servicio,
-            precio: cita.precio || 50, // Valor por defecto
+            precio: cita.precio || 50,
             total: cita.precio || 50
         };
     }
@@ -87,18 +85,9 @@ class Admin {
             const confirmadas = citas.filter(c => c.estado === 'confirmada').length;
             const completadas = citas.filter(c => c.estado === 'completada').length;
             const canceladas = citas.filter(c => c.estado === 'cancelada').length;
+            const ingresos = completadas * 50;
 
-            // Obtener ingresos (simulado)
-            const ingresos = completadas * 50; // Precio promedio
-
-            return {
-                total,
-                pendientes,
-                confirmadas,
-                completadas,
-                canceladas,
-                ingresos
-            };
+            return { total, pendientes, confirmadas, completadas, canceladas, ingresos };
         } catch (error) {
             throw new Error(`Error al obtener estadísticas: ${error.message}`);
         }

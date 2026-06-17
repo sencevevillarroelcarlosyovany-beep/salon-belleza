@@ -1,6 +1,10 @@
-// Configuración de Supabase
-const SUPABASE_URL = 'https://frjmozrimrwrkcbrinkn.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZyam1venJpbXJ3cmtjYnJpbmtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MDM3ODAsImV4cCI6MjA5NzI3OTc4MH0.xKImKf_HWTahEOVzIaX50-v8Eh7HTJdmSvklgS88lYI';
+// ========================================
+// CONFIGURACIÓN
+// ========================================
 
-// Inicializar cliente de Supabase
+const SUPABASE_URL = 'https://frjmozrimrwrkcbrinkn.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_YhH4zI7dv_fmUbm9Bf0VKA_Hxk9U2h1'; // REEMPLAZA CON TU CLAVE
+
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+console.log('✅ Configuración cargada');

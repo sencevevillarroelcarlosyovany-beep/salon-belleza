@@ -41,16 +41,16 @@
                 </div>
                 <div class="form-group">
                     <label>Fecha:</label>
-                    <input type="date" id="citaFecha" required min="2024-01-01">
+                    <input type="date" id="citaFecha" required>
                 </div>
                 <div class="form-group">
                     <label>Hora:</label>
                     <select id="citaHora" required>
-                        <option value="">Seleccionar hora...</option>
-                        ${Array.from({length: 10}, (_, i) => i + 9).map(h => 
-                            `<option value="${h}:00">${h}:00</option>`
-                        ).join('')}
+                        <option value="">Seleccionar hora disponible...</option>
                     </select>
+                    <small id="horaInfo" style="color: #7f8c8d; display: block; margin-top: 5px;">
+                        ⏰ Las citas son de 9:00 AM a 7:00 PM (duración aproximada 1 hora)
+                    </small>
                 </div>
                 <div class="form-group">
                     <label>Notas adicionales:</label>
@@ -59,6 +59,12 @@
                 <button type="submit" class="btn-primary">Agendar Cita</button>
                 <div id="citaMessage" class="message"></div>
             </form>
+            
+            <!-- Calendario de disponibilidad -->
+            <div id="disponibilidadContainer" style="margin-top: 30px; display: none;">
+                <h3>📊 Disponibilidad del Día</h3>
+                <div id="horasDisponibles" class="horas-grid"></div>
+            </div>
         </div>
 
         <!-- Servicios -->
@@ -68,149 +74,10 @@
         </div>
     </div>
 
+    <!-- JavaScript separado -->
     <script src="js/config.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/cliente.js"></script>
-    <script>
-        const auth = new Auth();
-        const cliente = new Cliente();
-        const user = auth.checkAuth('cliente');
-
-        // Mostrar nombre del cliente
-        document.getElementById('clienteName').textContent = `👋 ${user.nombre}`;
-
-        // Cargar datos
-        cargarMisCitas();
-        cargarServicios();
-
-        // Tabs
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                
-                const tab = this.dataset.tab;
-                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-                document.getElementById(tab + '-tab').classList.add('active');
-                
-                if (tab === 'citas') cargarMisCitas();
-                if (tab === 'servicios') cargarServicios();
-                if (tab === 'nueva') cargarServiciosSelect();
-            });
-        });
-
-        // Cargar servicios en el select
-        async function cargarServiciosSelect() {
-            try {
-                const servicios = await cliente.getServicios();
-                const select = document.getElementById('servicioSelect');
-                
-                // Mantener el option por defecto
-                select.innerHTML = '<option value="">Seleccionar servicio...</option>';
-                
-                servicios.forEach(servicio => {
-                    select.innerHTML += `
-                        <option value="${servicio.nombre}">${servicio.nombre} - $${servicio.precio} (${servicio.duracion} min)</option>
-                    `;
-                });
-            } catch (error) {
-                console.error('Error cargando servicios:', error);
-            }
-        }
-
-        // Cargar servicios
-        async function cargarServicios() {
-            try {
-                const servicios = await cliente.getServicios();
-                const container = document.getElementById('serviciosList');
-                
-                container.innerHTML = servicios.map(servicio => `
-                    <div class="card servicio-card">
-                        <h3>${servicio.nombre}</h3>
-                        <p>${servicio.descripcion || 'Sin descripción'}</p>
-                        <p><strong>💰 $${servicio.precio}</strong></p>
-                        <p>⏱️ ${servicio.duracion} minutos</p>
-                    </div>
-                `).join('');
-            } catch (error) {
-                document.getElementById('serviciosList').innerHTML = 
-                    `<p class="error">Error: ${error.message}</p>`;
-            }
-        }
-
-        // Cargar mis citas
-        async function cargarMisCitas() {
-            try {
-                const citas = await cliente.getCitasCliente(user.id);
-                const container = document.getElementById('misCitas');
-                
-                if (citas.length === 0) {
-                    container.innerHTML = '<p class="empty">No tienes citas agendadas</p>';
-                    return;
-                }
-
-                container.innerHTML = citas.map(cita => `
-                    <div class="card cita-card">
-                        <div class="cita-info">
-                            <h3>${cita.servicio}</h3>
-                            <p>📅 ${cita.fecha} ⏰ ${cita.hora}</p>
-                            <p>Estado: <span class="estado-${cita.estado}">${cita.estado}</span></p>
-                            ${cita.notas ? `<p>📝 ${cita.notas}</p>` : ''}
-                        </div>
-                        ${cita.estado === 'pendiente' || cita.estado === 'confirmada' ? `
-                            <button onclick="cancelarCita('${cita.id}')" class="btn-danger">Cancelar</button>
-                        ` : ''}
-                    </div>
-                `).join('');
-            } catch (error) {
-                document.getElementById('misCitas').innerHTML = 
-                    `<p class="error">Error: ${error.message}</p>`;
-            }
-        }
-
-        // Nueva Cita
-        document.getElementById('nuevaCitaForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const servicio = document.getElementById('servicioSelect').value;
-            const fecha = document.getElementById('citaFecha').value;
-            const hora = document.getElementById('citaHora').value;
-            const notas = document.getElementById('citaNotas').value;
-            const messageEl = document.getElementById('citaMessage');
-
-            if (!servicio || !fecha || !hora) {
-                messageEl.textContent = 'Por favor, completa todos los campos';
-                messageEl.className = 'message error';
-                return;
-            }
-
-            try {
-                await cliente.crearCita(user.id, servicio, fecha, hora, notas);
-                messageEl.textContent = '✅ Cita agendada correctamente';
-                messageEl.className = 'message success';
-                document.getElementById('nuevaCitaForm').reset();
-                cargarMisCitas();
-            } catch (error) {
-                messageEl.textContent = error.message;
-                messageEl.className = 'message error';
-            }
-        });
-
-        // Cancelar cita
-        async function cancelarCita(citaId) {
-            if (!confirm('¿Estás seguro de cancelar esta cita?')) return;
-            
-            try {
-                await cliente.cancelarCita(citaId);
-                alert('✅ Cita cancelada');
-                cargarMisCitas();
-            } catch (error) {
-                alert(`Error: ${error.message}`);
-            }
-        }
-
-        // Logout
-        document.getElementById('logoutBtn').addEventListener('click', () => auth.logout());
-    </script>
+    <script src="js/cliente-dashboard.js"></script>
 </body>
 </html>
