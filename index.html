@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salón de Belleza - Iniciar Sesión</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="auth-container">
+            <h1>💇‍♀️ Salón de Belleza</h1>
+            
+            <div class="auth-tabs">
+                <button class="tab-btn active" data-tab="login">Iniciar Sesión</button>
+                <button class="tab-btn" data-tab="register">Registrarse</button>
+            </div>
+
+            <!-- Login Form -->
+            <div id="login-form" class="auth-form active">
+                <h2>Iniciar Sesión</h2>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label>Email:</label>
+                        <input type="email" id="loginEmail" placeholder="admin@salon.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña:</label>
+                        <input type="password" id="loginPassword" placeholder="admin1234" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Iniciar Sesión</button>
+                    <div id="loginMessage" class="message"></div>
+                </form>
+                <div class="auth-info">
+                    <p>👤 Admin: admin@salon.com / admin1234</p>
+                    <p>👤 Cliente: registrarse y esperar aprobación</p>
+                </div>
+            </div>
+
+            <!-- Register Form -->
+            <div id="register-form" class="auth-form">
+                <h2>Registrarse</h2>
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label>Nombre:</label>
+                        <input type="text" id="registerName" placeholder="Tu nombre" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email:</label>
+                        <input type="email" id="registerEmail" placeholder="tu@email.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Teléfono:</label>
+                        <input type="tel" id="registerPhone" placeholder="123456789">
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña:</label>
+                        <input type="password" id="registerPassword" placeholder="Mínimo 6 caracteres" required minlength="6">
+                    </div>
+                    <button type="submit" class="btn-primary">Registrarse</button>
+                    <div id="registerMessage" class="message"></div>
+                </form>
+                <div class="auth-info">
+                    <p>📝 Tu cuenta debe ser aprobada por el administrador</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        const auth = new Auth();
+
+        // Tabs
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                const tab = this.dataset.tab;
+                document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+                document.getElementById(tab + '-form').classList.add('active');
+            });
+        });
+
+        // Login
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const messageEl = document.getElementById('loginMessage');
+
+            try {
+                const user = await auth.login(email, password);
+                
+                if (user.rol === 'admin') {
+                    window.location.href = 'dashboard-admin.html';
+                } else {
+                    window.location.href = 'dashboard-cliente.html';
+                }
+            } catch (error) {
+                messageEl.textContent = error.message;
+                messageEl.className = 'message error';
+            }
+        });
+
+        // Register
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nombre = document.getElementById('registerName').value;
+            const email = document.getElementById('registerEmail').value;
+            const telefono = document.getElementById('registerPhone').value;
+            const password = document.getElementById('registerPassword').value;
+            const messageEl = document.getElementById('registerMessage');
+
+            try {
+                await auth.register(nombre, email, telefono, password);
+                messageEl.textContent = '✅ Registro exitoso. Espera la aprobación del administrador.';
+                messageEl.className = 'message success';
+                document.getElementById('registerForm').reset();
+            } catch (error) {
+                messageEl.textContent = error.message;
+                messageEl.className = 'message error';
+            }
+        });
+    </script>
+</body>
+</html>

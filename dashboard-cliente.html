@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cliente - Salón de Belleza</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <h1>💇‍♀️ Panel de Cliente</h1>
+            <div class="user-info">
+                <span id="clienteName"></span>
+                <button id="logoutBtn" class="btn-secondary">Cerrar Sesión</button>
+            </div>
+        </header>
+
+        <div class="dashboard-tabs">
+            <button class="tab-btn active" data-tab="citas">📅 Mis Citas</button>
+            <button class="tab-btn" data-tab="nueva">📝 Nueva Cita</button>
+            <button class="tab-btn" data-tab="servicios">💆 Servicios</button>
+        </div>
+
+        <!-- Mis Citas -->
+        <div id="citas-tab" class="tab-content active">
+            <h2>Mis Citas</h2>
+            <div id="misCitas"></div>
+        </div>
+
+        <!-- Nueva Cita -->
+        <div id="nueva-tab" class="tab-content">
+            <h2>Agendar Nueva Cita</h2>
+            <form id="nuevaCitaForm">
+                <div class="form-group">
+                    <label>Servicio:</label>
+                    <select id="servicioSelect" required>
+                        <option value="">Seleccionar servicio...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Fecha:</label>
+                    <input type="date" id="citaFecha" required min="2024-01-01">
+                </div>
+                <div class="form-group">
+                    <label>Hora:</label>
+                    <select id="citaHora" required>
+                        <option value="">Seleccionar hora...</option>
+                        ${Array.from({length: 10}, (_, i) => i + 9).map(h => 
+                            `<option value="${h}:00">${h}:00</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Notas adicionales:</label>
+                    <textarea id="citaNotas" rows="3" placeholder="Alguna observación..."></textarea>
+                </div>
+                <button type="submit" class="btn-primary">Agendar Cita</button>
+                <div id="citaMessage" class="message"></div>
+            </form>
+        </div>
+
+        <!-- Servicios -->
+        <div id="servicios-tab" class="tab-content">
+            <h2>Servicios Disponibles</h2>
+            <div id="serviciosList"></div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/cliente.js"></script>
+    <script>
+        const auth = new Auth();
+        const cliente = new Cliente();
+        const user = auth.checkAuth('cliente');
+
+        // Mostrar nombre del cliente
+        document.getElementById('clienteName').textContent = `👋 ${user.nombre}`;
+
+        // Cargar datos
+        cargarMisCitas();
+        cargarServicios();
+
+        // Tabs
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                const tab = this.dataset.tab;
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                document.getElementById(tab + '-tab').classList.add('active');
+                
+                if (tab === 'citas') cargarMisCitas();
+                if (tab === 'servicios') cargarServicios();
+                if (tab === 'nueva') cargarServiciosSelect();
+            });
+        });
+
+        // Cargar servicios en el select
+        async function cargarServiciosSelect() {
+            try {
+                const servicios = await cliente.getServicios();
+                const select = document.getElementById('servicioSelect');
+                
+                // Mantener el option por defecto
+                select.innerHTML = '<option value="">Seleccionar servicio...</option>';
+                
+                servicios.forEach(servicio => {
+                    select.innerHTML += `
+                        <option value="${servicio.nombre}">${servicio.nombre} - $${servicio.precio} (${servicio.duracion} min)</option>
+                    `;
+                });
+            } catch (error) {
+                console.error('Error cargando servicios:', error);
+            }
+        }
+
+        // Cargar servicios
+        async function cargarServicios() {
+            try {
+                const servicios = await cliente.getServicios();
+                const container = document.getElementById('serviciosList');
+                
+                container.innerHTML = servicios.map(servicio => `
+                    <div class="card servicio-card">
+                        <h3>${servicio.nombre}</h3>
+                        <p>${servicio.descripcion || 'Sin descripción'}</p>
+                        <p><strong>💰 $${servicio.precio}</strong></p>
+                        <p>⏱️ ${servicio.duracion} minutos</p>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('serviciosList').innerHTML = 
+                    `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+
+        // Cargar mis citas
+        async function cargarMisCitas() {
+            try {
+                const citas = await cliente.getCitasCliente(user.id);
+                const container = document.getElementById('misCitas');
+                
+                if (citas.length === 0) {
+                    container.innerHTML = '<p class="empty">No tienes citas agendadas</p>';
+                    return;
+                }
+
+                container.innerHTML = citas.map(cita => `
+                    <div class="card cita-card">
+                        <div class="cita-info">
+                            <h3>${cita.servicio}</h3>
+                            <p>📅 ${cita.fecha} ⏰ ${cita.hora}</p>
+                            <p>Estado: <span class="estado-${cita.estado}">${cita.estado}</span></p>
+                            ${cita.notas ? `<p>📝 ${cita.notas}</p>` : ''}
+                        </div>
+                        ${cita.estado === 'pendiente' || cita.estado === 'confirmada' ? `
+                            <button onclick="cancelarCita('${cita.id}')" class="btn-danger">Cancelar</button>
+                        ` : ''}
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('misCitas').innerHTML = 
+                    `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+
+        // Nueva Cita
+        document.getElementById('nuevaCitaForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const servicio = document.getElementById('servicioSelect').value;
+            const fecha = document.getElementById('citaFecha').value;
+            const hora = document.getElementById('citaHora').value;
+            const notas = document.getElementById('citaNotas').value;
+            const messageEl = document.getElementById('citaMessage');
+
+            if (!servicio || !fecha || !hora) {
+                messageEl.textContent = 'Por favor, completa todos los campos';
+                messageEl.className = 'message error';
+                return;
+            }
+
+            try {
+                await cliente.crearCita(user.id, servicio, fecha, hora, notas);
+                messageEl.textContent = '✅ Cita agendada correctamente';
+                messageEl.className = 'message success';
+                document.getElementById('nuevaCitaForm').reset();
+                cargarMisCitas();
+            } catch (error) {
+                messageEl.textContent = error.message;
+                messageEl.className = 'message error';
+            }
+        });
+
+        // Cancelar cita
+        async function cancelarCita(citaId) {
+            if (!confirm('¿Estás seguro de cancelar esta cita?')) return;
+            
+            try {
+                await cliente.cancelarCita(citaId);
+                alert('✅ Cita cancelada');
+                cargarMisCitas();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', () => auth.logout());
+    </script>
+</body>
+</html>

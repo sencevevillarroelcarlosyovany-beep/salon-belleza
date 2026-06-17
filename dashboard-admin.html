@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Salón de Belleza</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <h1>💇‍♀️ Panel de Administración</h1>
+            <div class="user-info">
+                <span id="adminName"></span>
+                <button id="logoutBtn" class="btn-secondary">Cerrar Sesión</button>
+            </div>
+        </header>
+
+        <div class="dashboard-tabs">
+            <button class="tab-btn active" data-tab="pendientes">📋 Solicitudes</button>
+            <button class="tab-btn" data-tab="citas">📅 Citas</button>
+            <button class="tab-btn" data-tab="estadisticas">📊 Estadísticas</button>
+        </div>
+
+        <!-- Solicitudes Pendientes -->
+        <div id="pendientes-tab" class="tab-content active">
+            <h2>Solicitudes de Clientes</h2>
+            <div id="pendientesList"></div>
+        </div>
+
+        <!-- Citas -->
+        <div id="citas-tab" class="tab-content">
+            <h2>Gestión de Citas</h2>
+            <div class="filtro-citas">
+                <input type="date" id="filtroFecha">
+                <select id="filtroEstado">
+                    <option value="">Todos</option>
+                    <option value="pendiente">Pendientes</option>
+                    <option value="confirmada">Confirmadas</option>
+                    <option value="completada">Completadas</option>
+                    <option value="cancelada">Canceladas</option>
+                </select>
+                <button onclick="cargarCitas()" class="btn-primary">Filtrar</button>
+            </div>
+            <div id="citasList"></div>
+        </div>
+
+        <!-- Estadísticas -->
+        <div id="estadisticas-tab" class="tab-content">
+            <h2>Estadísticas</h2>
+            <div id="estadisticasContainer" class="stats-grid">
+                <!-- Generado por JS -->
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/admin.js"></script>
+    <script>
+        const auth = new Auth();
+        const admin = new Admin();
+        const user = auth.checkAuth('admin');
+
+        // Mostrar nombre del admin
+        document.getElementById('adminName').textContent = `👋 ${user.nombre}`;
+
+        // Cargar datos iniciales
+        cargarPendientes();
+        cargarCitas();
+        cargarEstadisticas();
+
+        // Tabs
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                const tab = this.dataset.tab;
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                document.getElementById(tab + '-tab').classList.add('active');
+                
+                if (tab === 'pendientes') cargarPendientes();
+                if (tab === 'citas') cargarCitas();
+                if (tab === 'estadisticas') cargarEstadisticas();
+            });
+        });
+
+        // Cargar clientes pendientes
+        async function cargarPendientes() {
+            try {
+                const pendientes = await auth.getClientesPendientes();
+                const container = document.getElementById('pendientesList');
+                
+                if (pendientes.length === 0) {
+                    container.innerHTML = '<p class="empty">No hay solicitudes pendientes</p>';
+                    return;
+                }
+
+                container.innerHTML = pendientes.map(cliente => `
+                    <div class="card solicitud-card">
+                        <div class="solicitud-info">
+                            <h3>${cliente.nombre}</h3>
+                            <p>📧 ${cliente.email}</p>
+                            <p>📱 ${cliente.telefono || 'No especificado'}</p>
+                            <small>📅 ${new Date(cliente.created_at).toLocaleDateString()}</small>
+                        </div>
+                        <button onclick="aprobarCliente('${cliente.id}')" class="btn-success">
+                            ✅ Aprobar
+                        </button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('pendientesList').innerHTML = 
+                    `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+
+        // Aprobar cliente
+        async function aprobarCliente(userId) {
+            try {
+                await auth.aprobarCliente(userId);
+                alert('✅ Cliente aprobado correctamente');
+                cargarPendientes();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Cargar citas
+        async function cargarCitas() {
+            try {
+                const fecha = document.getElementById('filtroFecha').value;
+                const estado = document.getElementById('filtroEstado').value;
+                
+                let citas;
+                if (fecha) {
+                    citas = await admin.getCitasPorFecha(fecha);
+                } else if (estado) {
+                    citas = await admin.getCitas(estado);
+                } else {
+                    citas = await admin.getCitas();
+                }
+
+                const container = document.getElementById('citasList');
+                
+                if (citas.length === 0) {
+                    container.innerHTML = '<p class="empty">No hay citas registradas</p>';
+                    return;
+                }
+
+                container.innerHTML = citas.map(cita => `
+                    <div class="card cita-card">
+                        <div class="cita-info">
+                            <h3>${cita.servicio}</h3>
+                            <p>👤 ${cita.usuarios.nombre}</p>
+                            <p>📧 ${cita.usuarios.email}</p>
+                            <p>📅 ${cita.fecha} ⏰ ${cita.hora}</p>
+                            <p>Estado: <span class="estado-${cita.estado}">${cita.estado}</span></p>
+                            ${cita.notas ? `<p>📝 ${cita.notas}</p>` : ''}
+                        </div>
+                        <div class="cita-actions">
+                            ${cita.estado === 'pendiente' ? `
+                                <button onclick="updateCita('${cita.id}', 'confirmada')" class="btn-success">Confirmar</button>
+                            ` : ''}
+                            ${cita.estado === 'confirmada' ? `
+                                <button onclick="updateCita('${cita.id}', 'completada')" class="btn-primary">Completar</button>
+                            ` : ''}
+                            ${cita.estado !== 'cancelada' && cita.estado !== 'completada' ? `
+                                <button onclick="updateCita('${cita.id}', 'cancelada')" class="btn-danger">Cancelar</button>
+                            ` : ''}
+                            <button onclick="generarFactura('${cita.id}')" class="btn-info">Factura</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('citasList').innerHTML = 
+                    `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+
+        // Actualizar estado de cita
+        async function updateCita(citaId, estado) {
+            if (!confirm(`¿Cambiar estado a "${estado}"?`)) return;
+            
+            try {
+                await admin.updateCitaEstado(citaId, estado);
+                alert('✅ Estado actualizado');
+                cargarCitas();
+                cargarEstadisticas();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Generar factura (simulada)
+        async function generarFactura(citaId) {
+            try {
+                const citas = await admin.getCitas();
+                const cita = citas.find(c => c.id === citaId);
+                
+                if (!cita) {
+                    alert('Cita no encontrada');
+                    return;
+                }
+
+                const factura = admin.generarFactura(cita);
+                
+                // Mostrar factura en popup
+                const facturaHTML = `
+                    <div class="factura-modal">
+                        <h2>🧾 FACTURA</h2>
+                        <p><strong>Número:</strong> ${factura.numero}</p>
+                        <p><strong>Fecha:</strong> ${factura.fecha}</p>
+                        <hr>
+                        <p><strong>Cliente:</strong> ${factura.cliente}</p>
+                        <p><strong>Servicio:</strong> ${factura.servicio}</p>
+                        <p><strong>Total:</strong> $${factura.total.toFixed(2)}</p>
+                        <hr>
+                        <button onclick="this.parentElement.remove()" class="btn-primary">Cerrar</button>
+                    </div>
+                `;
+                
+                const div = document.createElement('div');
+                div.innerHTML = facturaHTML;
+                document.body.appendChild(div.firstElementChild);
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Cargar estadísticas
+        async function cargarEstadisticas() {
+            try {
+                const stats = await admin.getEstadisticas();
+                const container = document.getElementById('estadisticasContainer');
+                
+                container.innerHTML = `
+                    <div class="stat-card">
+                        <h3>Total Citas</h3>
+                        <p class="stat-number">${stats.total}</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Pendientes</h3>
+                        <p class="stat-number">${stats.pendientes}</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Confirmadas</h3>
+                        <p class="stat-number">${stats.confirmadas}</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Completadas</h3>
+                        <p class="stat-number">${stats.completadas}</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Canceladas</h3>
+                        <p class="stat-number">${stats.canceladas}</p>
+                    </div>
+                    <div class="stat-card stat-card-ingresos">
+                        <h3>💰 Ingresos</h3>
+                        <p class="stat-number">$${stats.ingresos.toFixed(2)}</p>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('estadisticasContainer').innerHTML = 
+                    `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', () => auth.logout());
+    </script>
+</body>
+</html>
